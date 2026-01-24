@@ -51,7 +51,7 @@ export type ContextMenuParams = {
    */
   readonly topShift?: number
   /** Принудительно задать горизонтальное выравнивание */
-  readonly forceHGravity?: 'start' | 'end'
+  readonly forceHGravity?: 'start' | 'end' | 'center'
   /** Принудительно задать горизонтальный отступ
    * Меню не будет привязываться к положению кнопки
    */
@@ -315,9 +315,9 @@ export function matchContextMenuLayout(
   const endSpace = viewportWidth - rectX
 
   // Определяем hGravity
-  if (params.forceHGravity) {
+  if (params.forceHGravity && params.forceHGravity !== 'center') {
     hGravity = params.forceHGravity
-  } else {
+  } else if (!params.forceHGravity) {
     if (endSpace > childrenRect.width) {
       hGravity = 'start'
     } else if (startSpace > childrenRect.width) {
@@ -469,7 +469,24 @@ export function matchContextMenuLayout(
   //console.log(`🫢 topViewRect`, topViewRect)
 
   // Вычисления зависящие от hGravity
-  if (hGravity === 'start') {
+  if (params.forceHGravity === 'center') {
+    // hGravity: center - центрируем меню относительно anchor, не выходя за границы экрана
+    const anchorCenterX = rectX + rect.width / 2
+    // Вычисляем позицию меню, чтобы его центр совпадал с центром anchor
+    let ms = anchorCenterX - childrenRect.width / 2
+    // Ограничиваем, чтобы не выходило за левый край экрана
+    ms = Math.max(0, ms)
+    // Ограничиваем, чтобы не выходило за правый край экрана
+    ms = Math.min(ms, viewportWidth - childrenRect.width)
+    result.containerStyle.marginStart = ms
+    if (isCapture && topViewRect) {
+      // start margin для контейнера topView (также центрируем)
+      let tms = anchorCenterX - topViewRect.width / 2
+      tms = Math.max(0, tms)
+      tms = Math.min(tms, viewportWidth - topViewRect.width)
+      result.topViewStyle.marginStart = tms
+    }
+  } else if (hGravity === 'start') {
     // hGravity: start
     let vx = rectX
     if (params.forceHGravity && params.forceHMargin !== undefined) {
