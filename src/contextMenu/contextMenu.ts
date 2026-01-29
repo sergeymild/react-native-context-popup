@@ -406,16 +406,18 @@ export function matchContextMenuLayout(
         : paddingTop
   }
 
+  const hMargin = params.forceHMargin ?? 0
+
   if (params.forceHGravity === 'center') {
     const anchorCenterX = rectX + rect.width / 2
     let ms = anchorCenterX - childrenRect.width / 2
-    ms = Math.max(0, ms)
-    ms = Math.min(ms, viewportWidth - childrenRect.width)
+    ms = Math.max(hMargin, ms)
+    ms = Math.min(ms, viewportWidth - childrenRect.width - hMargin)
     result.containerStyle.marginStart = ms
     if (topViewRect) {
       let tms = anchorCenterX - topViewRect.width / 2
-      tms = Math.max(0, tms)
-      tms = Math.min(tms, viewportWidth - topViewRect.width)
+      tms = Math.max(hMargin, tms)
+      tms = Math.min(tms, viewportWidth - topViewRect.width - hMargin)
       result.topViewStyle.marginStart = tms
     }
   } else if (hGravity === 'start') {
@@ -423,10 +425,10 @@ export function matchContextMenuLayout(
     if (params.forceHGravity && params.forceHMargin !== undefined) {
       vx = params.forceHMargin
     }
-    const ms = Math.min(vx, viewportWidth - childrenRect.width)
+    const ms = Math.max(hMargin, Math.min(vx, viewportWidth - childrenRect.width - hMargin))
     result.containerStyle.marginStart = ms
     if (topViewRect) {
-      const tms = Math.min(vx, viewportWidth - topViewRect.width)
+      const tms = Math.max(hMargin, Math.min(vx, viewportWidth - topViewRect.width - hMargin))
       result.topViewStyle.marginStart = tms
     }
   } else {
@@ -437,10 +439,10 @@ export function matchContextMenuLayout(
         (contextMenuDimensions.viewportWidth - rectX - rect.width)
       vx = Math.max(-params.forceHMargin, vx + -dx)
     }
-    const ms = Math.max(0, vx + rect.width - childrenRect.width)
+    const ms = Math.max(hMargin, Math.min(vx + rect.width - childrenRect.width, viewportWidth - childrenRect.width - hMargin))
     result.containerStyle.marginStart = ms
     if (topViewRect) {
-      const tms = Math.max(0, vx + rect.width - topViewRect.width)
+      const tms = Math.max(hMargin, Math.min(vx + rect.width - topViewRect.width, viewportWidth - topViewRect.width - hMargin))
       result.topViewStyle.marginStart = tms
     }
   }
