@@ -58,9 +58,13 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
     const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined
     );
+    const autoHideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined
+    );
     const childrenContainerRef = useRef<View>(null);
     const topViewContainerRef = useRef<View>(null);
     const scrollViewRef = useRef<ScrollView>(null);
+    const onHideRef = useRef<(() => void) | undefined>(undefined);
 
     useEffect(() => {
       contextMenuDimensions.setInsets(props.appTopInset, props.appBottomInset);
@@ -70,10 +74,19 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       const emitterShowCleaner = _contextMenuEmitter.on(
         "renderContextMenu",
         (p) => {
-          closeTimerRef.current && clearTimeout(closeTimerRef.current);
+          if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+          if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
           setMeasuredData(undefined);
           setParams(p);
           setIsVisible(true);
+          onHideRef.current = p.onHide;
+
+          // Устанавливаем таймер автоскрытия если передан
+          if (p.autoHideTimeout && p.autoHideTimeout > 0) {
+            autoHideTimerRef.current = setTimeout(() => {
+              close();
+            }, p.autoHideTimeout);
+          }
         }
       );
       const emitterHideCleaner = _contextMenuEmitter.on(
@@ -81,16 +94,19 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
         () => close(),
       );
       return () => {
-        closeTimerRef.current && clearTimeout(closeTimerRef.current);
+        if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+        if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
         emitterShowCleaner();
         emitterHideCleaner();
       };
     }, []);
 
     const close = () => {
-      console.log(`🫢 close`);
-      closeTimerRef.current && clearTimeout(closeTimerRef.current);
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       setIsVisible(false);
+      onHideRef.current?.();
+      onHideRef.current = undefined;
       closeTimerRef.current = setTimeout(() => {
         setParams(undefined);
         setMeasuredData(undefined);
@@ -106,15 +122,15 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
     );
 
     useLayoutEffect(() => {
-      if (!childrenContainerRef.current) return;
       // Нет данных для отрисовки
       if (!params) return;
+      // Нет ни одного view для измерения
+      if (!childrenContainerRef.current && !topViewContainerRef.current) return;
 
       // Данные уже измерены
       if (measuredData) {
         // Нужен скролл
         if (layout.final && layout.scrollY > 0) {
-          console.log(`🫢 scroll to ${layout.scrollY}`, layout.final);
           requestAnimationFrame(() => {
             scrollViewRef.current?.scrollTo({
               y: layout.scrollY,
@@ -126,18 +142,17 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
         // Измеряем контент
         const menuRect = measureInWindowSync(childrenContainerRef);
         const topViewRect = measureInWindowSync(topViewContainerRef);
-        if (menuRect) {
-          setMeasuredData({ childrenContainerRect: menuRect, topViewRect });
+        // Достаточно измерить хотя бы один view
+        if (menuRect || topViewRect) {
+          setMeasuredData({
+            childrenContainerRect: menuRect ?? { x: 0, y: 0, width: 0, height: 0 },
+            topViewRect,
+          });
         }
       }
     }, [params, measuredData, layout]);
 
-    if (layout.final) {
-      console.log(`🫢 layout.final`, layout.final);
-    }
-
     const _topMenu = !!params &&
-      params.layoutMode === "capture" &&
       !!params.topView && (
         <View
           ref={topViewContainerRef}
@@ -216,13 +231,15 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
             {!!params && (
               <>
                 {!layout.topViewPin && topView}
-                <View
-                  ref={childrenContainerRef}
-                  style={layout.containerStyle}
-                  collapsable={false}
-                  onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}
-                  children={params.bottomView}
-                />
+                {!!params.bottomView && (
+                  <View
+                    ref={childrenContainerRef}
+                    style={layout.containerStyle}
+                    collapsable={false}
+                    onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}
+                    children={params.bottomView}
+                  />
+                )}
               </>
             )}
             {layout.final &&

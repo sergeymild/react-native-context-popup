@@ -64,6 +64,13 @@ export type ContextMenuParams = {
    * @default Берется тот, что задан через <ContextMenuProvider> props
    */
   readonly forceBottomInset?: number
+  /** Таймаут автоматического скрытия меню в миллисекундах.
+   * Если не указан или 0, меню не скрывается автоматически.
+   * Таймер очищается при ручном закрытии меню.
+   */
+  readonly autoHideTimeout?: number
+  /** Колбэк, вызываемый при скрытии меню */
+  readonly onHide?: () => void
 } & (
   | {
       /** Элемент, относительно которого будет отображаться контекстное меню
@@ -74,8 +81,10 @@ export type ContextMenuParams = {
       /** Режим отображения контекстного меню
        *  - 'anchor' - отображение bottomView около anchor */
       readonly layoutMode: 'anchor'
+      /** Контент, который будет отображаться над anchor */
+      readonly topView?: React.ReactNode | undefined
       /** Контент, который будет отображаться под anchor */
-      readonly bottomView: React.ReactNode
+      readonly bottomView?: React.ReactNode | undefined
     }
   | {
       /** RefObject элемента, относительно которого будет отображаться контекстное меню
@@ -88,7 +97,7 @@ export type ContextMenuParams = {
       /** Контент, который будет отображаться над anchor */
       readonly topView?: React.ReactNode | undefined
       /** Контент, который будет отображаться под anchor */
-      readonly bottomView: React.ReactNode
+      readonly bottomView?: React.ReactNode | undefined
     }
 )
 
@@ -97,6 +106,8 @@ export type ContextMenuParamsInternal = Omit<
   'anchor' | 'layoutMode'
 > & {
   readonly rect: MeasureRect
+  readonly topView?: React.ReactNode
+  readonly onHide?: () => void
 } & (
     | {
         readonly layoutMode: 'anchor'
@@ -104,7 +115,6 @@ export type ContextMenuParamsInternal = Omit<
     | {
         readonly layoutMode: 'capture'
         readonly preview: string
-        readonly topView: React.ReactNode
       }
   )
 
@@ -146,12 +156,12 @@ export async function showContextMenu(params: ContextMenuParams) {
   const internalParams: ContextMenuParamsInternal = {
     ...rest,
     rect,
+    topView: params.topView,
     ...(layoutMode === 'anchor'
       ? { layoutMode }
       : {
           layoutMode,
           preview: await getPreview(),
-          topView: params.topView,
         }),
   }
 
@@ -173,7 +183,6 @@ type MatchContextMenuLayoutResult = {
     hGravity: 'start' | 'end'
     topSpace: number
     bottomSpace: number
-    // isImportantContentInViewport: boolean
   }
 } & (
   | { final: false }
@@ -189,8 +198,6 @@ export function matchContextMenuLayout(
   measuredData: MeasuredData | undefined,
   gap: number,
 ): MatchContextMenuLayoutResult {
-  // ------------------------ Satge 1 ------------------------------------
-  // const translucent = IS_IOS || (params?.translucent ?? false)
   const paddingTop = params?.forceTopInset ?? contextMenuDimensions.appTopInset
   const paddingBottom = params?.forceBottomInset ?? contextMenuDimensions.appBottomInset
 
@@ -199,18 +206,13 @@ export function matchContextMenuLayout(
 
   const contentYPlatform = IS_IOS ? -paddingTop : 0
   const rectYPlatform = IS_IOS ? 0 : paddingTop
-  // const platformY = -paddingTop
   let scrollEnabled = true
 
   const firstStageConteinerStyle: ViewStyle = {
-    // Для первого измерения НЕ используем absolute, чтобы контент измерился корректно
-    // Скрываем пока не измерим
     opacity: 0,
     maxWidth: SCREEN_WIDTH,
   }
   const firstStageTopViewStyle: ViewStyle = {
-    // Для первого измерения НЕ используем absolute, чтобы контент измерился корректно
-    // Скрываем пока не измерим
     opacity: 0,
     maxWidth: SCREEN_WIDTH,
   }
@@ -230,15 +232,10 @@ export function matchContextMenuLayout(
   if (!measuredData || !params) return result
   const childrenRect = measuredData.childrenContainerRect
   const topViewRect = measuredData.topViewRect
-  // ------------------------ Satge 2 ------------------------------------
   const isCapture = params.layoutMode === 'capture'
   const rect = params.rect
 
-  // Высота важного контента (меню + кнопка)
   const importantContentHeight = childrenRect.height + gap + rect.height
-  // Если контент и кнопка помещается во viewport
-  // const isImportantContentInViewport = viewportHeight > importantContentHeight
-  // const layoutMode = params.layoutMode ?? 'anchor'
   const hasTopView = !!topViewRect
   let vGravity: 'top' | 'bottom' = 'top'
   let hGravity: 'start' | 'end' = 'start'
@@ -246,13 +243,6 @@ export function matchContextMenuLayout(
   const rectY = rect.y + contentYPlatform
   const rectX = rect.x
   const topViewHeight = topViewRect?.height ?? 0
-
-  console.log(`🫢 children rect`, {
-    params,
-    childrenRect: childrenRect,
-    layoutMode: params.layoutMode,
-    // preview: params.layoutMode === 'capture' ? params.preview : undefined,
-  })
 
   result = {
     paddingTop,
@@ -273,22 +263,17 @@ export function matchContextMenuLayout(
     rect: { ...rect, x: rect.x, y: rect.y + rectYPlatform },
     ghostViewStyle: {
       display: 'none',
-      // Заполняется ниже
     },
     topViewPin: false,
     topViewStyle:
-      isCapture && topViewRect
+      topViewRect
         ? {
             position: 'absolute',
             width: topViewRect.width,
             maxWidth: topViewRect.width,
             height: topViewRect.height,
             maxHeight: topViewRect.height,
-            start: topViewRect.x,
             top: paddingTop + rectY - topViewRect.height - gap,
-            // Будет меняться ниже
-            // start - при вычислений start контейнера меню, на основе hGravity
-            // top - после вычислений ghostViewStyle
           }
         : {
             display: 'none',
@@ -314,7 +299,6 @@ export function matchContextMenuLayout(
   const startSpace = rectX
   const endSpace = viewportWidth - rectX
 
-  // Определяем hGravity
   if (params.forceHGravity && params.forceHGravity !== 'center') {
     hGravity = params.forceHGravity
   } else if (!params.forceHGravity) {
@@ -330,51 +314,29 @@ export function matchContextMenuLayout(
   const isPinTopView =
     importantContentHeight + gap + topViewHeight > viewportHeight
 
-  // Вычисления зависящие от vGravity
   if (vGravity === 'bottom') {
-    // vGravity: bottom
-    /** marginTop от верха viewport до меню */
     let mt = rectY + rect.height + gap
-    // Проверим, хватает ли места для topView
-    // Поскольку vGravity Bottom, то mt должен быть больше 0
     if (
-      // !isPinTopView &&
       !!topViewHeight &&
       topViewHeight + gap + rect.height + gap > mt
     ) {
-      // Если места не хватает, то добавляем topViewHeight
       mt = topViewHeight + gap + rect.height + gap
     } else {
-      // <- Anti Scroll ->
-      // Если места хватает, то, если topView pinned, то уменьшаем mt,
-      // чтобы не было лишнего  отскролла меню от pinned topView
-      // (а то получится дыра при скроле)
       if (isPinTopView) {
         mt = topViewHeight + gap + rect.height + gap
       }
     }
 
     if (isCapture) {
-      // Вычисляем scrollY так, чтобы контент был виден полностью,
-      // но не уходил верхом за экран
       let scrl = 0
 
-      // Если есть topView, то важно не только меню, но и topView.
-      // А соответственно весь набор (topView + rect + childrenRect)
-      console.log(`🫢 1`)
       if (hasTopView) {
-        console.log(`🫢 2`)
         const viewPackHeight = isPinTopView
           ? childrenRect.height
           : topViewRect.height + gap + importantContentHeight
 
-        // Если контент помещается во viewport, то скроллить не нужно
         if (viewportHeight > viewPackHeight) {
-          console.log(`🫢 3`)
-          // Но если с учетом mt не помещается, то скролим до низа меню
           if (mt + viewportHeight > viewPackHeight && !isPinTopView) {
-            console.log(`🫢 4`)
-            // Вычитая высоту topView если оно pinned, чтобы не ускроллится под него
             scrl =
               mt +
               viewPackHeight -
@@ -382,19 +344,11 @@ export function matchContextMenuLayout(
               (isPinTopView ? topViewHeight : 0)
           }
         } else {
-          console.log(`🫢 5`)
-          // Скролим до верха меню
           scrl = mt - gap - rect.height - gap - topViewRect.height
         }
       } else {
-        console.log(`🫢 6`)
-        // Если контент помещается во viewport, то скроллить не нужно
         if (viewportHeight > childrenRect.height) {
-          console.log(`🫢 7`)
-          // Но если с учетом mt не помещается, то скролим до низа меню
           if (viewportHeight + mt > childrenRect.height && !isPinTopView) {
-            console.log(`🫢 8`)
-            // Вычитая высоту topView если оно pinned, чтобы не ускроллится под него
             scrl =
               mt +
               childrenRect.height -
@@ -402,54 +356,40 @@ export function matchContextMenuLayout(
               (isPinTopView ? topViewHeight : 0)
           }
         } else {
-          console.log(`🫢 9`)
-          // Скролим до верха меню
           scrl = mt
         }
       }
-      console.log(`🫢 10`, scrl)
       scrollY = scrl
     }
 
     result.containerStyle.marginTop = mt
     if (!isPinTopView) {
-      // Здесь меняем для кейса, когда topView не помещается в viewport, но при том оно не pinned
       result.topViewStyle.top =
         paddingTop + mt - topViewHeight - gap - rect.height - gap
     }
   } else {
-    // vGravity: top
     const mt = rectY - gap - childrenRect.height
     if (mt < 0) {
-      /** Размер части меню, которую видно на экране,
-       * когда часть его уехала за экран */
       const restMenuHeight = childrenRect.height + mt
-
-      /** Осттояние от rectY до низа viewport
-       * Прежде чем добавлять снизу подскролльный паддинг,
-       * нужно сначала забить пространство fillBottomSpace
-       */
       const fillBottomSpace = viewportHeight - restMenuHeight
-      const scrollPadding = fillBottomSpace
 
-      /** Теперь marginTop можно занулить, заполненный paddingBottom
-       * сделает так, что все что съедет вниз,
-       * на сколько съедет, на столько и будет скроллиться
-       * вручную это считать не нужно
-       */
       result.containerStyle.marginTop = 0
-      // /** Скроллим на столько, сколько съезжает вниз */
-      // scrollY = -mt
-      /** Скроллить не надл, т.к. не нужно уводить верх за экран */
       scrollY = 0
 
-      result.paddingBottom = paddingBottom + scrollPadding
+      result.paddingBottom = paddingBottom + fillBottomSpace
+
+      if (topViewRect && !isPinTopView) {
+        result.topViewStyle.top = paddingTop - topViewHeight - gap
+      }
     } else {
       result.containerStyle.marginTop = mt
+
+      if (topViewRect && !isPinTopView) {
+        result.topViewStyle.top = paddingTop + mt - topViewHeight - gap
+      }
     }
   }
 
-  // Если важный контент помещается во viewport, то скролл включаем
   if (importantContentHeight + topViewHeight <= viewportHeight) {
     scrollEnabled = false
   }
@@ -466,42 +406,30 @@ export function matchContextMenuLayout(
         : paddingTop
   }
 
-  //console.log(`🫢 topViewRect`, topViewRect)
-
-  // Вычисления зависящие от hGravity
   if (params.forceHGravity === 'center') {
-    // hGravity: center - центрируем меню относительно anchor, не выходя за границы экрана
     const anchorCenterX = rectX + rect.width / 2
-    // Вычисляем позицию меню, чтобы его центр совпадал с центром anchor
     let ms = anchorCenterX - childrenRect.width / 2
-    // Ограничиваем, чтобы не выходило за левый край экрана
     ms = Math.max(0, ms)
-    // Ограничиваем, чтобы не выходило за правый край экрана
     ms = Math.min(ms, viewportWidth - childrenRect.width)
     result.containerStyle.marginStart = ms
-    if (isCapture && topViewRect) {
-      // start margin для контейнера topView (также центрируем)
+    if (topViewRect) {
       let tms = anchorCenterX - topViewRect.width / 2
       tms = Math.max(0, tms)
       tms = Math.min(tms, viewportWidth - topViewRect.width)
       result.topViewStyle.marginStart = tms
     }
   } else if (hGravity === 'start') {
-    // hGravity: start
     let vx = rectX
     if (params.forceHGravity && params.forceHMargin !== undefined) {
       vx = params.forceHMargin
     }
-    // start margin для контейнера меню
     const ms = Math.min(vx, viewportWidth - childrenRect.width)
     result.containerStyle.marginStart = ms
-    if (isCapture && topViewRect) {
-      // start margin для контейнера topView
+    if (topViewRect) {
       const tms = Math.min(vx, viewportWidth - topViewRect.width)
       result.topViewStyle.marginStart = tms
     }
   } else {
-    // hGravity: end
     let vx = rectX
     if (params.forceHGravity && params.forceHMargin !== undefined) {
       const dx =
@@ -511,8 +439,7 @@ export function matchContextMenuLayout(
     }
     const ms = Math.max(0, vx + rect.width - childrenRect.width)
     result.containerStyle.marginStart = ms
-    if (isCapture && topViewRect) {
-      // start margin для контейнера topView
+    if (topViewRect) {
       const tms = Math.max(0, vx + rect.width - topViewRect.width)
       result.topViewStyle.marginStart = tms
     }
@@ -520,8 +447,6 @@ export function matchContextMenuLayout(
 
   result.scrollEnabled = scrollEnabled
   result.topViewPin = isPinTopView
-  // Preview будет с position: 'absolute', поэтому на нее не действуют padding'и контейнера
-  // Поэтому мы добавляем их отдельно
   result.ghostViewStyle = {
     position: 'absolute',
     width: rect.width,
@@ -533,22 +458,15 @@ export function matchContextMenuLayout(
           Number(result.containerStyle.marginTop) -
           rect.height -
           gap
-        : 0 /* imposible */,
+        : 0,
   }
 
-  //console.log(`🫢 ghostViewStyle`, result.ghostViewStyle)
-  //console.log(`🫢 topViewStyle`, result.topViewStyle)
-
-  // ------------------------------------------------------------
   result.debug = {
     vGravity,
     hGravity,
     topSpace,
     bottomSpace,
-    // isImportantContentInViewport,
   }
   result.scrollY = scrollY
-  //console.log(`🫢 result`, result)
-  //console.log(`🫢 debug`, result.debug)
   return result
 }
