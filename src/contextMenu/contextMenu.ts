@@ -335,25 +335,34 @@ export function matchContextMenuLayout(
           ? childrenRect.height
           : topViewRect.height + gap + importantContentHeight
 
-        if (viewportHeight > viewPackHeight) {
-          if (mt + viewportHeight > viewPackHeight && !isPinTopView) {
+        if (isPinTopView) {
+          // TopView is pinned outside ScrollView, scroll to show bottomView
+          const bottomViewBottom = mt + childrenRect.height
+          if (bottomViewBottom > viewportHeight) {
+            scrl = bottomViewBottom - viewportHeight
+          }
+        } else if (viewportHeight > viewPackHeight) {
+          if (mt + viewportHeight > viewPackHeight) {
             scrl =
               mt +
               viewPackHeight -
-              viewportHeight -
-              (isPinTopView ? topViewHeight : 0)
+              viewportHeight
           }
         } else {
           scrl = mt - gap - rect.height - gap - topViewRect.height
         }
       } else {
-        if (viewportHeight > childrenRect.height) {
-          if (viewportHeight + mt > childrenRect.height && !isPinTopView) {
+        if (isPinTopView) {
+          const bottomViewBottom = mt + childrenRect.height
+          if (bottomViewBottom > viewportHeight) {
+            scrl = bottomViewBottom - viewportHeight
+          }
+        } else if (viewportHeight > childrenRect.height) {
+          if (viewportHeight + mt > childrenRect.height) {
             scrl =
               mt +
               childrenRect.height -
-              viewportHeight -
-              (isPinTopView ? topViewHeight : 0)
+              viewportHeight
           }
         } else {
           scrl = mt
@@ -398,6 +407,9 @@ export function matchContextMenuLayout(
 
   if (importantContentHeight + topViewHeight <= viewportHeight) {
     scrollEnabled = false
+  }
+  if (scrollY > 0) {
+    scrollEnabled = true
   }
 
   if (isPinTopView) {
