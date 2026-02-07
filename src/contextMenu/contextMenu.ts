@@ -360,6 +360,12 @@ export function matchContextMenuLayout(
         }
       }
       scrollY = scrl
+    } else {
+      // Anchor mode: auto-scroll if bottomView is below viewport
+      const bottomViewBottom = mt + childrenRect.height
+      if (bottomViewBottom > viewportHeight) {
+        scrollY = bottomViewBottom - viewportHeight
+      }
     }
 
     result.containerStyle.marginTop = mt
