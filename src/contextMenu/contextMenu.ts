@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
 import type { ViewStyle } from 'react-native'
-import { Dimensions, Platform } from 'react-native'
+import { Dimensions, PixelRatio, Platform } from 'react-native'
 import { captureRef } from 'react-native-view-shot'
 
 import { _contextMenuEmitter } from './ContextMenuProvider'
@@ -146,10 +146,13 @@ export async function showContextMenu(params: ContextMenuParams) {
 
   const getPreview = (): Promise<string> => {
     if (layoutMode !== 'capture') return Promise.resolve('')
+    const scale = PixelRatio.get()
     return captureRef(anchor, {
       format: 'png',
       quality: 1,
       result: 'base64',
+      width: rect.width * scale,
+      height: rect.height * scale,
     })
   }
 
