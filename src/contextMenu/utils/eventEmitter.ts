@@ -27,10 +27,10 @@ export function eventEmitter<T extends EventMap>(): Emitter<T> {
       listeners[key] = (listeners[key] || []).filter((f) => f !== fn)
     },
     emit(key, data) {
-      // eslint-disable-next-line no-extra-semi
-      ;(listeners[key] || []).forEach(function (fn) {
-        fn(data)
-      })
+      const fns = listeners[key] || []
+      for (let i = fns.length - 1; i >= 0; i--) {
+        fns[i](data)
+      }
     },
   }
 }

@@ -36,6 +36,7 @@ interface ContextMunuEmitterEvents {
 }
 
 export const _contextMenuEmitter = eventEmitter<ContextMunuEmitterEvents>();
+const _handledEvents = new WeakSet<ContextMenuParamsInternal>();
 
 const BLOCK_BUBBLING_RESPONDER = (_event: GestureResponderEvent) => true;
 
@@ -74,6 +75,8 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       const emitterShowCleaner = _contextMenuEmitter.on(
         "renderContextMenu",
         (p) => {
+          if (_handledEvents.has(p)) return;
+          _handledEvents.add(p);
           if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
           if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
           setMeasuredData(undefined);
