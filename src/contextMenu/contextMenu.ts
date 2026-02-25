@@ -10,6 +10,20 @@ import { measureInWindowSync } from './utils/view.utils'
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const IS_IOS = Platform.OS === 'ios'
 
+let _hasFastImage: boolean | undefined
+function hasFastImage(): boolean {
+  if (_hasFastImage === undefined) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('@d11/react-native-fast-image')
+      _hasFastImage = true
+    } catch {
+      _hasFastImage = false
+    }
+  }
+  return _hasFastImage
+}
+
 export type MeasureRect = {
   x: number
   y: number
@@ -144,16 +158,22 @@ export async function showContextMenu(params: ContextMenuParams) {
     rect.y += params.topShift
   }
 
+  const useTmpFile = !IS_IOS && hasFastImage()
+
   const getPreview = (): Promise<string> => {
     if (layoutMode !== 'capture') return Promise.resolve('')
     const scale = PixelRatio.get()
     return captureRef(anchor, {
       format: 'png',
       quality: 1,
-      result: 'base64',
-      width: rect.width * scale,
-      height: rect.height * scale,
-    })
+      result: useTmpFile ? 'tmpfile' : 'base64',
+      ...(useTmpFile ? {} : {
+        width: rect.width * scale,
+        height: rect.height * scale,
+      }),
+    }).then((result) =>
+      useTmpFile ? result : `data:image/png;base64,${result}`
+    )
   }
 
   const internalParams: ContextMenuParamsInternal = {

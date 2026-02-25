@@ -9,12 +9,34 @@ import React, {
 import {
   GestureResponderEvent,
   Image,
+  ImageStyle,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
+
+let FastImage: any = null;
+try {
+  FastImage = require("@d11/react-native-fast-image").default;
+} catch {}
+
+const PreviewImage = Platform.OS === "android" && FastImage
+  ? ({ style, uri }: { style: ImageStyle; uri: string }) => (
+      <FastImage
+        style={style}
+        source={{ uri }}
+        resizeMode={FastImage.resizeMode.stretch}
+      />
+    )
+  : ({ style, uri }: { style: ImageStyle; uri: string }) => (
+      <Image
+        style={style}
+        source={{ uri }}
+      />
+    );
 
 import {
   ContextMenuParamsInternal,
@@ -251,9 +273,9 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
               <View
                 style={layout.ghostViewStyle}
                 onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}>
-                <Image
+                <PreviewImage
                   style={styles.preview}
-                  source={{ uri: `data:image/png;base64,${params.preview}` }}
+                  uri={params.preview}
                 />
               </View>
             ) : null}
