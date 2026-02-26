@@ -1,7 +1,7 @@
 import type { RefObject } from 'react'
 import type { ViewStyle } from 'react-native'
 import { Dimensions, PixelRatio, Platform } from 'react-native'
-import { captureRef } from 'react-native-view-shot'
+import {CaptureOptions, captureRef} from 'react-native-view-shot'
 
 import { _contextMenuEmitter } from './ContextMenuProvider'
 import { contextMenuDimensions } from './helpers/Dimensions'
@@ -87,33 +87,33 @@ export type ContextMenuParams = {
   readonly onHide?: () => void
 } & (
   | {
-      /** Элемент, относительно которого будет отображаться контекстное меню
-       *  - если передан RefObject, то будет использован метод measureInWindowSync для измерения размеров элемента
-       *  - если передан MeasureRect, то будет использован этот размер
-       */
-      readonly anchor: ContextMenuAnchor
-      /** Режим отображения контекстного меню
-       *  - 'anchor' - отображение bottomView около anchor */
-      readonly layoutMode: 'anchor'
-      /** Контент, который будет отображаться над anchor */
-      readonly topView?: React.ReactNode | undefined
-      /** Контент, который будет отображаться под anchor */
-      readonly bottomView?: React.ReactNode | undefined
-    }
+  /** Элемент, относительно которого будет отображаться контекстное меню
+   *  - если передан RefObject, то будет использован метод measureInWindowSync для измерения размеров элемента
+   *  - если передан MeasureRect, то будет использован этот размер
+   */
+  readonly anchor: ContextMenuAnchor
+  /** Режим отображения контекстного меню
+   *  - 'anchor' - отображение bottomView около anchor */
+  readonly layoutMode: 'anchor'
+  /** Контент, который будет отображаться над anchor */
+  readonly topView?: React.ReactNode | undefined
+  /** Контент, который будет отображаться под anchor */
+  readonly bottomView?: React.ReactNode | undefined
+}
   | {
-      /** RefObject элемента, относительно которого будет отображаться контекстное меню
-       *  будет использован метод measureInWindowSync для измерения размеров элемента
-       *  будет использован метод capture для клонирования отображения anchor
-       */
-      readonly anchor: RefObject<any>
-      /** Клонирование отображения anchor и отображение topView и bottomView вокруг него */
-      readonly layoutMode: 'capture'
-      /** Контент, который будет отображаться над anchor */
-      readonly topView?: React.ReactNode | undefined
-      /** Контент, который будет отображаться под anchor */
-      readonly bottomView?: React.ReactNode | undefined
-    }
-)
+  /** RefObject элемента, относительно которого будет отображаться контекстное меню
+   *  будет использован метод measureInWindowSync для измерения размеров элемента
+   *  будет использован метод capture для клонирования отображения anchor
+   */
+  readonly anchor: RefObject<any>
+  /** Клонирование отображения anchor и отображение topView и bottomView вокруг него */
+  readonly layoutMode: 'capture'
+  /** Контент, который будет отображаться над anchor */
+  readonly topView?: React.ReactNode | undefined
+  /** Контент, который будет отображаться под anchor */
+  readonly bottomView?: React.ReactNode | undefined
+}
+  )
 
 export type ContextMenuParamsInternal = Omit<
   ContextMenuParams,
@@ -123,13 +123,13 @@ export type ContextMenuParamsInternal = Omit<
   readonly topView?: React.ReactNode
   readonly onHide?: () => void
 } & (
-    | {
-        readonly layoutMode: 'anchor'
-      }
-    | {
-        readonly layoutMode: 'capture'
-        readonly preview: string
-      }
+  | {
+  readonly layoutMode: 'anchor'
+}
+  | {
+  readonly layoutMode: 'capture'
+  readonly preview: string
+}
   )
 
 // type ItemPressed = { id: string; type: 'top' | 'bottom' }
@@ -158,22 +158,23 @@ export async function showContextMenu(params: ContextMenuParams) {
     rect.y += params.topShift
   }
 
-  const useTmpFile = !IS_IOS && hasFastImage()
+  const useTmpFile = Platform.OS === 'android'
 
-  const getPreview = (): Promise<string> => {
+  const getPreview = async (): Promise<string> => {
     if (layoutMode !== 'capture') return Promise.resolve('')
     const scale = PixelRatio.get()
-    return captureRef(anchor, {
+    let options: CaptureOptions = {
       format: 'png',
       quality: 1,
-      result: useTmpFile ? 'tmpfile' : 'base64',
-      ...(useTmpFile ? {} : {
-        width: rect.width * scale,
-        height: rect.height * scale,
-      }),
-    }).then((result) =>
-      useTmpFile ? result : `data:image/png;base64,${result}`
-    )
+      result: 'base64'
+    }
+    if (useTmpFile) {
+      options.result = 'tmpfile'
+      options.width = rect.width * scale
+      options.height = rect.height * scale
+    }
+    const r = await captureRef(anchor, options)
+    return useTmpFile ? r : `data:image/png;base64,${r}`
   }
 
   const internalParams: ContextMenuParamsInternal = {
@@ -183,9 +184,9 @@ export async function showContextMenu(params: ContextMenuParams) {
     ...(layoutMode === 'anchor'
       ? { layoutMode }
       : {
-          layoutMode,
-          preview: await getPreview(),
-        }),
+        layoutMode,
+        preview: await getPreview(),
+      }),
   }
 
   _contextMenuEmitter.emit('renderContextMenu', internalParams)
@@ -210,11 +211,11 @@ type MatchContextMenuLayoutResult = {
 } & (
   | { final: false }
   | {
-      final: true
-      rect: MeasureRect
-      ghostViewStyle: ViewStyle
-    }
-)
+  final: true
+  rect: MeasureRect
+  ghostViewStyle: ViewStyle
+}
+  )
 
 export function matchContextMenuLayout(
   params: ContextMenuParamsInternal | undefined,
@@ -291,17 +292,17 @@ export function matchContextMenuLayout(
     topViewStyle:
       topViewRect
         ? {
-            position: 'absolute',
-            width: topViewRect.width,
-            maxWidth: topViewRect.width,
-            height: topViewRect.height,
-            maxHeight: topViewRect.height,
-            top: paddingTop + rectY - topViewRect.height - gap,
-          }
+          position: 'absolute',
+          width: topViewRect.width,
+          maxWidth: topViewRect.width,
+          height: topViewRect.height,
+          maxHeight: topViewRect.height,
+          top: paddingTop + rectY - topViewRect.height - gap,
+        }
         : {
-            display: 'none',
-            position: 'absolute',
-          },
+          display: 'none',
+          position: 'absolute',
+        },
   }
 
   const topSpace = rectY - gap
@@ -440,10 +441,10 @@ export function matchContextMenuLayout(
       topViewRect &&
       importantContentHeight + topViewRect.height <= viewportHeight
         ? SCREEN_HEIGHT -
-          paddingBottom -
-          importantContentHeight -
-          gap -
-          topViewRect.height
+        paddingBottom -
+        importantContentHeight -
+        gap -
+        topViewRect.height
         : paddingTop
   }
 
@@ -498,9 +499,9 @@ export function matchContextMenuLayout(
     top:
       vGravity === 'bottom'
         ? paddingTop +
-          Number(result.containerStyle.marginTop) -
-          rect.height -
-          gap
+        Number(result.containerStyle.marginTop) -
+        rect.height -
+        gap
         : 0,
   }
 
