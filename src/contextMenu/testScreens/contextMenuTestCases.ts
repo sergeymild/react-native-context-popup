@@ -1,4 +1,4 @@
-import { ContextMenuTestProps } from './ContextMenuTest'
+import type { ContextMenuTestProps } from './ContextMenuTest'
 
 const captureBaseCase: ContextMenuTestProps = {
   mode: 'capture',

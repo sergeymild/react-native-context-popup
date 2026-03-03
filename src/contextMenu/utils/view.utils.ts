@@ -1,21 +1,4 @@
-import { RefObject } from 'react'
-import { NativeMethods, LayoutRectangle, View } from 'react-native'
-
-// -------------------------
-
-type AsyncMeasureResult =
-  | (LayoutRectangle & { pageX: number; pageY: number })
-  | undefined
-
-export const asyncMeasure = async (
-  viewRef: RefObject<{ measure: NativeMethods['measure'] }>,
-) =>
-  new Promise<AsyncMeasureResult>((resolve) => {
-    if (!viewRef.current) return resolve(undefined)
-    viewRef.current.measure((x, y, width, height, pageX, pageY) =>
-      resolve({ x, y, width, height, pageX, pageY }),
-    )
-  })
+import type {View} from 'react-native'
 
 // -------------------------
 

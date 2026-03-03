@@ -1,14 +1,14 @@
 import React, { memo, useLayoutEffect, useRef, useState } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import {
   ScrollView,
-  StyleProp,
   StyleSheet,
   View,
-  ViewStyle,
 } from "react-native";
 
 import { measureSync } from "../utils/view.utils";
-import { ContextMenuTest, ContextMenuTestProps } from "./ContextMenuTest";
+import type { ContextMenuTestProps } from "./ContextMenuTest";
+import { ContextMenuTest } from "./ContextMenuTest";
 
 const SINGLE_CASE = false;
 

@@ -6,10 +6,9 @@ import React, {
   useRef,
   useState,
 } from "react";
+import type { GestureResponderEvent, ImageStyle } from "react-native";
 import {
-  GestureResponderEvent,
   Image,
-  ImageStyle,
   Modal,
   Platform,
   ScrollView,
@@ -18,10 +17,12 @@ import {
   View,
 } from "react-native";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let FastImage: any = null;
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   FastImage = require("@d11/react-native-fast-image").default;
-} catch {}
+} catch { /* optional dependency */ }
 
 const PreviewImage = Platform.OS === "android" && FastImage
   ? ({ style, uri }: { style: ImageStyle; uri: string }) => (
@@ -38,11 +39,8 @@ const PreviewImage = Platform.OS === "android" && FastImage
       />
     );
 
-import {
-  ContextMenuParamsInternal,
-  matchContextMenuLayout,
-  MeasuredData,
-} from "./contextMenu";
+import type { ContextMenuParamsInternal, MeasuredData } from "./contextMenu";
+import { matchContextMenuLayout } from "./contextMenu";
 import { contextMenuDimensions } from "./helpers/Dimensions";
 import { eventEmitter } from "./utils/eventEmitter";
 import { measureInWindowSync } from "./utils/view.utils";

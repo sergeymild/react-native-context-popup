@@ -1,14 +1,14 @@
 import React, { memo, useRef } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import {
-  StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ViewStyle,
 } from "react-native";
 
-import { ContextMenuParams, showContextMenu } from "../contextMenu";
+import type { ContextMenuParams } from "../contextMenu";
+import { showContextMenu } from "../contextMenu";
 
 export type ContextMenuTestProps = {
   style?: StyleProp<ViewStyle>;

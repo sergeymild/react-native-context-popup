@@ -1,7 +1,8 @@
 import type { RefObject } from 'react'
 import type { ViewStyle } from 'react-native'
 import { Dimensions, PixelRatio, Platform } from 'react-native'
-import {CaptureOptions, captureRef} from 'react-native-view-shot'
+import type {CaptureOptions} from 'react-native-view-shot';
+import { captureRef} from 'react-native-view-shot'
 
 import { _contextMenuEmitter } from './ContextMenuProvider'
 import { contextMenuDimensions } from './helpers/Dimensions'
@@ -9,20 +10,6 @@ import { measureInWindowSync } from './utils/view.utils'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 const IS_IOS = Platform.OS === 'ios'
-
-let _hasFastImage: boolean | undefined
-function hasFastImage(): boolean {
-  if (_hasFastImage === undefined) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require('@d11/react-native-fast-image')
-      _hasFastImage = true
-    } catch {
-      _hasFastImage = false
-    }
-  }
-  return _hasFastImage
-}
 
 export type MeasureRect = {
   x: number
@@ -36,7 +23,7 @@ export interface MeasuredData {
   readonly topViewRect: MeasureRect | undefined
 }
 
-export type ContextMenuAnchor = MeasureRect | RefObject<any>
+export type ContextMenuAnchor = MeasureRect | RefObject<never>
 
 export type ContextMenuParams = {
   /** Тип фона контекстного меню
@@ -105,7 +92,7 @@ export type ContextMenuParams = {
    *  будет использован метод measureInWindowSync для измерения размеров элемента
    *  будет использован метод capture для клонирования отображения anchor
    */
-  readonly anchor: RefObject<any>
+  readonly anchor: RefObject<never>
   /** Клонирование отображения anchor и отображение topView и bottomView вокруг него */
   readonly layoutMode: 'capture'
   /** Контент, который будет отображаться над anchor */
@@ -163,7 +150,7 @@ export async function showContextMenu(params: ContextMenuParams) {
   const getPreview = async (): Promise<string> => {
     if (layoutMode !== 'capture') return Promise.resolve('')
     const scale = PixelRatio.get()
-    let options: CaptureOptions = {
+    const options: CaptureOptions = {
       format: 'png',
       quality: 1,
       result: 'base64'

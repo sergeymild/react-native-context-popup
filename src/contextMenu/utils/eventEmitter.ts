@@ -1,4 +1,4 @@
-type EventMap = Record<string, any>
+type EventMap = Record<string, unknown>
 type EventKey<T extends EventMap> = string & keyof T
 type EventReceiver<T> = (params: T) => void
 export type EmitterUnsubscribe = () => void
