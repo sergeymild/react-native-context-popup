@@ -50,7 +50,7 @@ const DEFAULT_GAP = 4;
 const DEFAULT_ANCHOR_BACKGROUND_COLOR = "transparent";
 const DEFAULT_CAPTURE_BACKGROUND_COLOR = "blur";
 
-interface ContextMunuEmitterEvents {
+type ContextMunuEmitterEvents = {
   readonly renderContextMenu: ContextMenuParamsInternal;
   readonly hideContextMenu: undefined;
 }

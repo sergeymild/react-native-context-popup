@@ -1,4 +1,4 @@
-type EventMap = Record<string, unknown>
+type EventMap = { [key: string]: unknown }
 type EventKey<T extends EventMap> = string & keyof T
 type EventReceiver<T> = (params: T) => void
 export type EmitterUnsubscribe = () => void
@@ -29,7 +29,7 @@ export function eventEmitter<T extends EventMap>(): Emitter<T> {
     emit(key, data) {
       const fns = listeners[key] || []
       for (let i = fns.length - 1; i >= 0; i--) {
-        fns[i](data)
+        fns[i]!(data)
       }
     },
   }

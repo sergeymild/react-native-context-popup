@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { ViewStyle } from 'react-native'
+import type { View, ViewStyle } from 'react-native'
 import { Dimensions, PixelRatio, Platform } from 'react-native'
 import type {CaptureOptions} from 'react-native-view-shot';
 import { captureRef} from 'react-native-view-shot'
@@ -23,7 +23,7 @@ export interface MeasuredData {
   readonly topViewRect: MeasureRect | undefined
 }
 
-export type ContextMenuAnchor = MeasureRect | RefObject<never>
+export type ContextMenuAnchor = MeasureRect | RefObject<View | null>
 
 export type ContextMenuParams = {
   /** Тип фона контекстного меню
@@ -92,7 +92,7 @@ export type ContextMenuParams = {
    *  будет использован метод measureInWindowSync для измерения размеров элемента
    *  будет использован метод capture для клонирования отображения anchor
    */
-  readonly anchor: RefObject<never>
+  readonly anchor: RefObject<View | null>
   /** Клонирование отображения anchor и отображение topView и bottomView вокруг него */
   readonly layoutMode: 'capture'
   /** Контент, который будет отображаться над anchor */
