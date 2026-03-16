@@ -221,12 +221,26 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
           onPress={close}>
           {/* Background type Blur */}
           {typeof background === "string" && background === "blur" && (
-            <BlurView
-              style={styles.background}
-              blurAmount={20}
-              blurType={params?.theme ?? "light"}
-              reducedTransparencyFallbackColor="transparent"
-            />
+            Platform.OS === "android" ? (
+              <View
+                style={[
+                  styles.background,
+                  {
+                    backgroundColor:
+                      (params?.theme ?? "light") === "dark"
+                        ? "rgba(0,0,0,0.6)"
+                        : "rgba(255,255,255,0.6)",
+                  },
+                ]}
+              />
+            ) : (
+              <BlurView
+                style={styles.background}
+                blurAmount={20}
+                blurType={params?.theme ?? "light"}
+                reducedTransparencyFallbackColor="transparent"
+              />
+            )
           )}
           {/* Background type View */}
           {typeof background !== "string" && (
