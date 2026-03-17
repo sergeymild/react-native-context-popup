@@ -150,15 +150,19 @@ export async function showContextMenu(params: ContextMenuParams) {
   const getPreview = async (): Promise<string> => {
     if (layoutMode !== 'capture') return Promise.resolve('')
     const scale = PixelRatio.get()
+    const maxCaptureHeight = SCREEN_HEIGHT * 2
+    const captureScale = (rect.height > maxCaptureHeight / scale)
+      ? maxCaptureHeight / (rect.height * scale)
+      : 1
     const options: CaptureOptions = {
       format: 'png',
-      quality: 1,
-      result: 'base64'
+      quality: captureScale < 1 ? 0.8 : 1,
+      result: 'base64',
+      width: rect.width * scale * captureScale,
+      height: rect.height * scale * captureScale,
     }
     if (useTmpFile) {
       options.result = 'tmpfile'
-      options.width = rect.width * scale
-      options.height = rect.height * scale
     }
     const r = await captureRef(anchor, options)
     return useTmpFile ? r : `data:image/png;base64,${r}`
