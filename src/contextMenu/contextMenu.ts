@@ -126,8 +126,10 @@ export const contextPopup = {
   hide: hideContextMenu,
 }
 
-function hideContextMenu() {
-  _contextMenuEmitter.emit('hideContextMenu', undefined)
+function hideContextMenu(): Promise<void> {
+  return new Promise((resolve) => {
+    _contextMenuEmitter.emit('hideContextMenu', resolve)
+  })
 }
 
 export async function showContextMenu(params: ContextMenuParams) {

@@ -52,7 +52,7 @@ const DEFAULT_CAPTURE_BACKGROUND_COLOR = "blur";
 
 type ContextMunuEmitterEvents = {
   readonly renderContextMenu: ContextMenuParamsInternal;
-  readonly hideContextMenu: undefined;
+  readonly hideContextMenu: (() => void) | undefined;
 }
 
 export const _contextMenuEmitter = eventEmitter<ContextMunuEmitterEvents>();
@@ -86,6 +86,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
     const topViewContainerRef = useRef<View>(null);
     const scrollViewRef = useRef<ScrollView>(null);
     const onHideRef = useRef<(() => void) | undefined>(undefined);
+    const onDismissRef = useRef<(() => void) | undefined>(undefined);
 
     useEffect(() => {
       contextMenuDimensions.setInsets(props.appTopInset, props.appBottomInset);
@@ -114,7 +115,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       );
       const emitterHideCleaner = _contextMenuEmitter.on(
         "hideContextMenu",
-        () => close(),
+        (onDone) => close(onDone),
       );
       return () => {
         if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -124,16 +125,22 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       };
     }, []);
 
-    const close = () => {
+    const close = (onDone?: () => void) => {
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       setIsVisible(false);
       onHideRef.current?.();
       onHideRef.current = undefined;
+      onDismissRef.current = onDone;
       closeTimerRef.current = setTimeout(() => {
         setParams(undefined);
         setMeasuredData(undefined);
       }, CLEAR_PARAMS_TIMEOUT);
+    };
+
+    const handleModalDismiss = () => {
+      onDismissRef.current?.();
+      onDismissRef.current = undefined;
     };
 
     const zIndex = params?.zIndex ?? props.zIndex ?? 1000;
@@ -207,7 +214,8 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
         animationType="fade"
         statusBarTranslucent={true}
         presentationStyle="overFullScreen"
-        onRequestClose={close}>
+        onRequestClose={() => close()}
+        onDismiss={handleModalDismiss}>
         <TouchableOpacity
           style={{
             ...styles.base,
@@ -218,7 +226,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
                 : undefined,
           }}
           activeOpacity={1}
-          onPress={close}>
+          onPress={() => close()}>
           {/* Background type Blur */}
           {typeof background === "string" && background === "blur" && (
             Platform.OS === "android" ? (
