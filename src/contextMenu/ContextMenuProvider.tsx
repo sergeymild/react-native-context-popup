@@ -236,8 +236,8 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
                   {
                     backgroundColor:
                       (params?.theme ?? "light") === "dark"
-                        ? "rgba(0,0,0,0.6)"
-                        : "rgba(255,255,255,0.6)",
+                        ? "rgba(0,0,0,0.8)"
+                        : "rgba(255,255,255,0.8)",
                   },
                 ]}
               />
