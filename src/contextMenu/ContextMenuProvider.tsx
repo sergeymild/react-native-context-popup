@@ -135,6 +135,11 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       closeTimerRef.current = setTimeout(() => {
         setParams(undefined);
         setMeasuredData(undefined);
+        // Android не вызывает onDismiss у Modal, поэтому resolve Promise здесь
+        if (Platform.OS === "android") {
+          onDismissRef.current?.();
+          onDismissRef.current = undefined;
+        }
       }, CLEAR_PARAMS_TIMEOUT);
     };
 
