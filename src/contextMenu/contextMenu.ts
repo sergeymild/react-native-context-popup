@@ -72,6 +72,13 @@ export type ContextMenuParams = {
   readonly autoHideTimeout?: number
   /** Колбэк, вызываемый при скрытии меню */
   readonly onHide?: () => void
+  /** When false, renders the overlay as an absolute-positioned View in the root
+   * component instead of inside a Modal. This prevents layout recalculations
+   * and scroll jumps caused by Modal's window metrics changes.
+   * Intended for layoutMode: 'anchor'.
+   * @default true
+   */
+  readonly useModal?: boolean
 } & (
   | {
   /** Элемент, относительно которого будет отображаться контекстное меню

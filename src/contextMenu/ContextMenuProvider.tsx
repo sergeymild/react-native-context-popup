@@ -131,11 +131,16 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       setIsVisible(false);
       onHideRef.current?.();
       onHideRef.current = undefined;
-      onDismissRef.current = onDone;
+      // When not using Modal there is no dismiss animation, resolve immediately.
+      if (params?.useModal === false) {
+        onDone?.();
+      } else {
+        onDismissRef.current = onDone;
+      }
       closeTimerRef.current = setTimeout(() => {
         setParams(undefined);
         setMeasuredData(undefined);
-        // Android не вызывает onDismiss у Modal, поэтому resolve Promise здесь
+        // Android does not fire onDismiss on Modal, so resolve the Promise here.
         if (Platform.OS === "android") {
           onDismissRef.current?.();
           onDismissRef.current = undefined;
@@ -212,6 +217,101 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
         ? DEFAULT_CAPTURE_BACKGROUND_COLOR
         : DEFAULT_ANCHOR_BACKGROUND_COLOR);
 
+    const overlayContent = (
+      <TouchableOpacity
+        style={{
+          ...styles.base,
+          zIndex,
+          backgroundColor:
+            typeof background === "string" && background !== "blur"
+              ? background
+              : undefined,
+        }}
+        activeOpacity={1}
+        onPress={() => close()}>
+        {/* Background type Blur */}
+        {typeof background === "string" && background === "blur" && (
+          Platform.OS === "android" ? (
+            <View
+              style={[
+                styles.background,
+                {
+                  backgroundColor:
+                    (params?.theme ?? "light") === "dark"
+                      ? "rgba(0,0,0,0.8)"
+                      : "rgba(255,255,255,0.8)",
+                },
+              ]}
+            />
+          ) : (
+            <BlurView
+              style={styles.background}
+              blurAmount={20}
+              blurType={params?.theme ?? "light"}
+              reducedTransparencyFallbackColor="transparent"
+            />
+          )
+        )}
+        {/* Background type View */}
+        {typeof background !== "string" && (
+          <View style={styles.background} children={background} />
+        )}
+
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={layout.scrollEnabled}
+          contentContainerStyle={{
+            // Use absolute position on first render so content is measured correctly
+            ...(layout.final
+              ? {
+                  position: "relative",
+                }
+              : {
+                  position: "absolute",
+                  width: contextMenuDimensions.screenWidth,
+                  alignItems: "flex-start",
+                }),
+            paddingTop: layout.paddingTop,
+            paddingBottom: layout.paddingBottom,
+          }}>
+          {!!params && (
+            <>
+              {!layout.topViewPin && topView}
+              {!!params.bottomView && (
+                <View
+                  ref={childrenContainerRef}
+                  style={layout.containerStyle}
+                  collapsable={false}
+                  onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}
+                  children={params.bottomView}
+                />
+              )}
+            </>
+          )}
+          {layout.final &&
+          params?.layoutMode === "capture" &&
+          !!params.preview ? (
+            <View
+              style={layout.ghostViewStyle}
+              onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}>
+              <PreviewImage
+                style={styles.preview}
+                uri={params.preview}
+              />
+            </View>
+          ) : null}
+        </ScrollView>
+        {!!layout.topViewPin && topView}
+      </TouchableOpacity>
+    );
+
+    if (params?.useModal === false) {
+      // Render as a plain absolute View to avoid Modal-induced layout recalculations
+      if (!isVisible) return null;
+      return overlayContent;
+    }
+
     return (
       <Modal
         visible={isVisible}
@@ -221,92 +321,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
         presentationStyle="overFullScreen"
         onRequestClose={() => close()}
         onDismiss={handleModalDismiss}>
-        <TouchableOpacity
-          style={{
-            ...styles.base,
-            zIndex,
-            backgroundColor:
-              typeof background === "string" && background !== "blur"
-                ? background
-                : undefined,
-          }}
-          activeOpacity={1}
-          onPress={() => close()}>
-          {/* Background type Blur */}
-          {typeof background === "string" && background === "blur" && (
-            Platform.OS === "android" ? (
-              <View
-                style={[
-                  styles.background,
-                  {
-                    backgroundColor:
-                      (params?.theme ?? "light") === "dark"
-                        ? "rgba(0,0,0,0.8)"
-                        : "rgba(255,255,255,0.8)",
-                  },
-                ]}
-              />
-            ) : (
-              <BlurView
-                style={styles.background}
-                blurAmount={20}
-                blurType={params?.theme ?? "light"}
-                reducedTransparencyFallbackColor="transparent"
-              />
-            )
-          )}
-          {/* Background type View */}
-          {typeof background !== "string" && (
-            <View style={styles.background} children={background} />
-          )}
-
-          <ScrollView
-            ref={scrollViewRef}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={layout.scrollEnabled}
-            contentContainerStyle={{
-              // Для первого измерения используем absolute, чтобы контент измерился корректно
-              ...(layout.final
-                ? {
-                    position: "relative",
-                  }
-                : {
-                    position: "absolute",
-                    width: contextMenuDimensions.screenWidth,
-                    alignItems: "flex-start",
-                  }),
-              paddingTop: layout.paddingTop,
-              paddingBottom: layout.paddingBottom,
-            }}>
-            {!!params && (
-              <>
-                {!layout.topViewPin && topView}
-                {!!params.bottomView && (
-                  <View
-                    ref={childrenContainerRef}
-                    style={layout.containerStyle}
-                    collapsable={false}
-                    onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}
-                    children={params.bottomView}
-                  />
-                )}
-              </>
-            )}
-            {layout.final &&
-            params?.layoutMode === "capture" &&
-            !!params.preview ? (
-              <View
-                style={layout.ghostViewStyle}
-                onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}>
-                <PreviewImage
-                  style={styles.preview}
-                  uri={params.preview}
-                />
-              </View>
-            ) : null}
-          </ScrollView>
-          {!!layout.topViewPin && topView}
-        </TouchableOpacity>
+        {overlayContent}
       </Modal>
     );
   }
