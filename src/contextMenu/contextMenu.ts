@@ -106,6 +106,11 @@ export type ContextMenuParams = {
   readonly topView?: React.ReactNode | undefined
   /** Контент, который будет отображаться под anchor */
   readonly bottomView?: React.ReactNode | undefined
+  /** Множитель масштаба превью относительно центра anchor.
+   * Влияет и на визуальный размер ghost-view, и на расчёт расположения bottomView/topView.
+   * @default 1
+   */
+  readonly captureScale?: number
 }
   )
 
@@ -123,6 +128,7 @@ export type ContextMenuParamsInternal = Omit<
   | {
   readonly layoutMode: 'capture'
   readonly preview: string
+  readonly captureScale?: number
 }
   )
 
@@ -257,7 +263,18 @@ export function matchContextMenuLayout(
   const childrenRect = measuredData.childrenContainerRect
   const topViewRect = measuredData.topViewRect
   const isCapture = params.layoutMode === 'capture'
-  const rect = params.rect
+  const captureScale =
+    params.layoutMode === 'capture' ? (params.captureScale ?? 1) : 1
+  const baseRect = params.rect
+  const rect: MeasureRect =
+    captureScale === 1
+      ? baseRect
+      : {
+          width: baseRect.width * captureScale,
+          height: baseRect.height * captureScale,
+          x: baseRect.x - (baseRect.width * (captureScale - 1)) / 2,
+          y: baseRect.y - (baseRect.height * (captureScale - 1)) / 2,
+        }
 
   const importantContentHeight = childrenRect.height + gap + rect.height
   const hasTopView = !!topViewRect
