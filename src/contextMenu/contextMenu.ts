@@ -183,16 +183,15 @@ export async function showContextMenu(params: ContextMenuParams) {
     return useTmpFile ? r : `data:image/png;base64,${r}`
   }
 
+  const preview = layoutMode !== 'anchor' ? await getPreview() : undefined
+
   const internalParams: ContextMenuParamsInternal = {
     ...rest,
     rect,
     topView: params.topView,
     ...(layoutMode === 'anchor'
       ? { layoutMode }
-      : {
-        layoutMode,
-        preview: await getPreview(),
-      }),
+      : { layoutMode, preview: preview! }),
   }
 
   _contextMenuEmitter.emit('renderContextMenu', internalParams)

@@ -162,35 +162,41 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
     );
 
     useLayoutEffect(() => {
-      // Нет данных для отрисовки
       if (!params) return;
-      // Нет ни одного view для измерения
       if (!childrenContainerRef.current && !topViewContainerRef.current) return;
 
-      // Данные уже измерены
       if (measuredData) {
-        // Нужен скролл
         if (layout.final && layout.scrollY > 0) {
-          requestAnimationFrame(() => {
+          const rafId = requestAnimationFrame(() => {
             scrollViewRef.current?.scrollTo({
               y: layout.scrollY,
               animated: layout.animatedScroll,
             });
           });
+          return () => cancelAnimationFrame(rafId);
         }
       } else {
-        // Измеряем контент
-        const menuRect = measureInWindowSync(childrenContainerRef);
-        const topViewRect = measureInWindowSync(topViewContainerRef);
-        // Достаточно измерить хотя бы один view
-        if (menuRect || topViewRect) {
-          setMeasuredData({
-            childrenContainerRect: menuRect ?? { x: 0, y: 0, width: 0, height: 0 },
-            topViewRect,
-          });
-        }
+        // In RN New Architecture (Fabric), useLayoutEffect fires before the
+        // native layout pass completes for newly-created Modal views, so
+        // measureInWindowSync returns zeros. Defer by one frame to let Fabric
+        // finish layout before measuring.
+        const rafId = requestAnimationFrame(() => {
+          const menuRect = measureInWindowSync(childrenContainerRef);
+          const topViewRect = measureInWindowSync(topViewContainerRef);
+          if (menuRect || topViewRect) {
+            setMeasuredData({
+              childrenContainerRect: menuRect ?? { x: 0, y: 0, width: 0, height: 0 },
+              topViewRect,
+            });
+          }
+        });
+        return () => cancelAnimationFrame(rafId);
       }
-    }, [params, measuredData, layout]);
+    // layout intentionally excluded: it creates a new object every render and
+    // would cancel the RAF before it fires. layout.final/scrollY are read
+    // inside the callback where they are always current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [params, measuredData]);
 
     const _topMenu = !!params &&
       !!params.topView && (
