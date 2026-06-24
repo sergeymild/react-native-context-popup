@@ -137,6 +137,11 @@ export type ContextMenuParamsInternal = Omit<
 export const contextPopup = {
   show: showContextMenu,
   hide: hideContextMenu,
+  remeasure: remeasureContextMenu,
+}
+
+function remeasureContextMenu() {
+  _contextMenuEmitter.emit('remeasureContextMenu', undefined)
 }
 
 function hideContextMenu(): Promise<void> {
@@ -313,7 +318,7 @@ export function matchContextMenuLayout(
           maxWidth: topViewRect.width,
           height: topViewRect.height,
           maxHeight: topViewRect.height,
-          top: paddingTop + rectY - topViewRect.height - gap,
+          top: Math.max(paddingTop, paddingTop + rectY - topViewRect.height - gap),
         }
         : {
           display: 'none',
@@ -419,8 +424,10 @@ export function matchContextMenuLayout(
 
     result.containerStyle.marginTop = mt
     if (!isPinTopView) {
-      result.topViewStyle.top =
-        paddingTop + mt - topViewHeight - gap - rect.height - gap
+      result.topViewStyle.top = Math.max(
+        paddingTop,
+        paddingTop + mt - topViewHeight - gap - rect.height - gap,
+      )
     }
   } else {
     const mt = rectY - gap - childrenRect.height

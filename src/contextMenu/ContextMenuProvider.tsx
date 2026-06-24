@@ -53,6 +53,7 @@ const DEFAULT_CAPTURE_BACKGROUND_COLOR = "blur";
 type ContextMunuEmitterEvents = {
   readonly renderContextMenu: ContextMenuParamsInternal;
   readonly hideContextMenu: (() => void) | undefined;
+  readonly remeasureContextMenu: undefined;
 }
 
 export const _contextMenuEmitter = eventEmitter<ContextMunuEmitterEvents>();
@@ -87,6 +88,14 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
     const scrollViewRef = useRef<ScrollView>(null);
     const onHideRef = useRef<(() => void) | undefined>(undefined);
     const onDismissRef = useRef<(() => void) | undefined>(undefined);
+    // Remeasure counter — incremented by remeasureContextMenu. measuredData is
+    // intentionally NOT cleared so layout.final stays true and the expensive
+    // screenshot preview is never unmounted during the remeasure cycle.
+    const [remeasureTrigger, setRemeasureTrigger] = useState(0);
+    const lastRemeasureTriggerRef = useRef(0);
+    // Suppress the post-layout scrollTo that fires after a remeasure so the
+    // viewport stays put while the user is interacting.
+    const skipScrollAfterRemeasureRef = useRef(false);
 
     useEffect(() => {
       contextMenuDimensions.setInsets(props.appTopInset, props.appBottomInset);
@@ -100,6 +109,9 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
           _handledEvents.add(p);
           if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
           if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+          lastRemeasureTriggerRef.current = 0;
+          skipScrollAfterRemeasureRef.current = false;
+          setRemeasureTrigger(0);
           setMeasuredData(undefined);
           setParams(p);
           setIsVisible(true);
@@ -117,11 +129,16 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
         "hideContextMenu",
         (onDone) => close(onDone),
       );
+      const emitterRemeasureCleaner = _contextMenuEmitter.on(
+        "remeasureContextMenu",
+        () => setRemeasureTrigger(t => t + 1),
+      );
       return () => {
         if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
         if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
         emitterShowCleaner();
         emitterHideCleaner();
+        emitterRemeasureCleaner();
       };
     }, []);
 
@@ -161,12 +178,22 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
       params?.gap ?? DEFAULT_GAP
     );
 
+    // True for the single frame between the remeasure trigger and the RAF that
+    // delivers new measurements. During this window the topViewStyle still has
+    // the old (collapsed) dimensions — hiding the wrapper prevents the expanded
+    // content from visually overflowing onto the anchored message.
+    const hasPendingRemeasure = remeasureTrigger > lastRemeasureTriggerRef.current;
+
     useLayoutEffect(() => {
       if (!params) return;
       if (!childrenContainerRef.current && !topViewContainerRef.current) return;
 
-      if (measuredData) {
-        if (layout.final && layout.scrollY > 0) {
+      if (measuredData && !hasPendingRemeasure) {
+        // Already measured — scroll into view if needed, but skip the scroll
+        // that follows a remeasure so the viewport stays where the user left it.
+        const shouldSkipScroll = skipScrollAfterRemeasureRef.current;
+        skipScrollAfterRemeasureRef.current = false;
+        if (!shouldSkipScroll && layout.final && layout.scrollY > 0) {
           const rafId = requestAnimationFrame(() => {
             scrollViewRef.current?.scrollTo({
               y: layout.scrollY,
@@ -175,46 +202,57 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = memo(
           });
           return () => cancelAnimationFrame(rafId);
         }
-      } else {
-        // In RN New Architecture (Fabric), useLayoutEffect fires before the
-        // native layout pass completes for newly-created Modal views, so
-        // measureInWindowSync returns zeros. Defer by one frame to let Fabric
-        // finish layout before measuring.
-        const rafId = requestAnimationFrame(() => {
-          const menuRect = measureInWindowSync(childrenContainerRef);
-          const topViewRect = measureInWindowSync(topViewContainerRef);
-          if (menuRect || topViewRect) {
-            setMeasuredData({
-              childrenContainerRect: menuRect ?? { x: 0, y: 0, width: 0, height: 0 },
-              topViewRect,
-            });
-          }
-        });
-        return () => cancelAnimationFrame(rafId);
+        return;
       }
+
+      // Initial measurement OR remeasure (hasPendingRemeasure). measuredData is
+      // kept intact during remeasure so layout.final stays true and the preview
+      // image is never unmounted. Mark trigger as handled and suppress scroll.
+      if (hasPendingRemeasure) {
+        lastRemeasureTriggerRef.current = remeasureTrigger;
+        skipScrollAfterRemeasureRef.current = true;
+      }
+      // In RN New Architecture (Fabric), useLayoutEffect fires before the
+      // native layout pass completes for newly-created Modal views, so
+      // measureInWindowSync returns zeros. Defer by one frame to let Fabric
+      // finish layout before measuring.
+      const rafId = requestAnimationFrame(() => {
+        const menuRect = measureInWindowSync(childrenContainerRef);
+        const topViewRect = measureInWindowSync(topViewContainerRef);
+        if (menuRect || topViewRect) {
+          setMeasuredData({
+            childrenContainerRect: menuRect ?? { x: 0, y: 0, width: 0, height: 0 },
+            topViewRect,
+          });
+        }
+      });
+      return () => cancelAnimationFrame(rafId);
     // layout intentionally excluded: it creates a new object every render and
     // would cancel the RAF before it fires. layout.final/scrollY are read
     // inside the callback where they are always current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [params, measuredData]);
+    }, [params, measuredData, remeasureTrigger]);
 
+    // During a remeasure the old topViewStyle still has collapsed width/height,
+    // which would constrain expanded content and corrupt measurements. Use the
+    // unconstrained first-stage style so the content sizes to its natural width.
+    const topMenuStyle = hasPendingRemeasure
+      ? { opacity: 0, maxWidth: contextMenuDimensions.screenWidth }
+      : layout.topViewStyle;
     const _topMenu = !!params &&
       !!params.topView && (
         <View
           ref={topViewContainerRef}
-          style={layout.topViewStyle}
+          style={topMenuStyle}
           collapsable={false}
           onStartShouldSetResponder={BLOCK_BUBBLING_RESPONDER}
           children={params.topView}
         />
       );
     const topView = !!_topMenu && (
-      <>
-        {!layout.final && (
-          <View style={styles.measureContainer}>{_topMenu}</View>
-        )}
-        {layout.final && _topMenu}
-      </>
+      <View style={hasPendingRemeasure ? [styles.measureContainer, styles.hidden] : styles.measureContainer}>
+        {_topMenu}
+      </View>
     );
 
     const background =
@@ -353,5 +391,8 @@ const styles = StyleSheet.create({
   },
   measureContainer: {
     position: "absolute",
+  },
+  hidden: {
+    opacity: 0,
   },
 });
